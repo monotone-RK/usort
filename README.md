@@ -1,4 +1,4 @@
-# Utah Sorting Librrary
+# Utah Sorting Library
 
 Fast distributed sorting routines using MPI and OpenMP. 
 
