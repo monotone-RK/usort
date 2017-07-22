@@ -32,7 +32,7 @@
     #define SORT_FUNCTION par::sampleSort
 #endif
 
-// #define __VERIFY__
+#define __VERIFY__
 
 
 enum DistribType{
