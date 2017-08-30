@@ -19,52 +19,50 @@
 #include <parUtils.h>
 
 #ifdef KWICK
-	#if KWAY > 2
-		#define SORT_FUNCTION par::HyperQuickSort_kway
-	#else
-		#ifdef SWAPRANKS
+  #if KWAY > 2
+    #define SORT_FUNCTION par::HyperQuickSort_kway
+  #else
+    #ifdef SWAPRANKS
       #define SORT_FUNCTION par::RankSwapSort
     #else
-	 	  #define SORT_FUNCTION par::HyperQuickSort
+      #define SORT_FUNCTION par::HyperQuickSort
     #endif
-	#endif
+  #endif
 #else
-    #define SORT_FUNCTION par::sampleSort
+  #define SORT_FUNCTION par::sampleSort
 #endif
 
 #define __VERIFY__
 
 
-enum DistribType{
-	UNIF_DISTRIB,
-	GAUSS_DISTRIB,
-};
+enum DistribType { UNIF_DISTRIB, GAUSS_DISTRIB, };
 
+
+/******************************************************************************/
 void printResults(int num_threads, MPI_Comm comm);
 
-void getStats(double val, double *meanV, double *minV, double *maxV, MPI_Comm comm) 
-{ 
-	int p; 
-	double d, din;
-	din = val;
+/******************************************************************************/
+void getStats(double val, double *meanV, double *minV, double *maxV, MPI_Comm comm) { 
+  int         p; 
+  double d, din;
+  din = val;
   MPI_Comm_size(comm, &p);
-	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_SUM, 0, comm); *meanV = d/p;
-	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MIN, 0, comm); *minV = d;
-	MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MAX, 0, comm); *maxV = d;
+  MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_SUM, 0, comm); *meanV = d/p;
+  MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MIN, 0, comm); *minV  = d;
+  MPI_Reduce(&din, &d, 1, MPI_DOUBLE, MPI_MAX, 0, comm); *maxV  = d;
 }
 
+/******************************************************************************/
 DistribType getDistType(char* code) {
-	if(!strcmp(code,"GAUSS\0")){
-		return GAUSS_DISTRIB;
-	}else{
-		return UNIF_DISTRIB;
-	}
+  if (!strcmp(code,"GAUSS\0")) return GAUSS_DISTRIB;
+  else                         return UNIF_DISTRIB;
 }
 
+/******************************************************************************/
 long getNumElements(char* code) {
-  unsigned int slen = strlen(code);
-  char dtype = code[0];
-  char tmp[128];
+  unsigned int slen  = strlen(code);
+  char         dtype = code[0];
+  char         tmp[128];
   strncpy(tmp, code+1, slen-3); tmp[slen-3] = '\0';
 
   long numBytes = atol(tmp);
@@ -85,27 +83,20 @@ long getNumElements(char* code) {
       std::cout << "unknown code " << code[slen-2] << std::endl;
       return 0;
   };
-
+  
   switch (dtype) {
-    case 'd': // double array
-      return numBytes/sizeof(double);
-      break;
-    case 'f': // float array
-      return numBytes/sizeof(float);
-      break;
-    case 'i': // int array
-      return numBytes/sizeof(int);
-      break;
-    case 'l': // long array
-      return numBytes/sizeof(long);
-      break;
+    case 'd': return numBytes/sizeof(double);  // double array
+    case 'f': return numBytes/sizeof(float);   // float array
+    case 'i': return numBytes/sizeof(int);     // int array
+    case 'l': return numBytes/sizeof(long);    // long array
     default:
-			std::cout << "unknown dtype: " << dtype << std::endl;
+      std::cout << "unknown dtype: " << dtype << std::endl;
       return 0;
   };
-
+  
 }
 
+/******************************************************************************/
 template <class T>
 bool verify (std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
 
@@ -160,50 +151,49 @@ bool verify (std::vector<T>& in_, std::vector<T> &out_, MPI_Comm comm){
   return true;
 }
 
+/******************************************************************************/
 template <class T>
-double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
+double time_sort(size_t N, MPI_Comm comm, DistribType dist_type) {
   int myrank, p;
 
   MPI_Comm_rank(comm, &myrank);
-  MPI_Comm_size(comm,&p);
-  int omp_p=omp_get_max_threads();
+  MPI_Comm_size(comm, &p);
+  int omp_p = omp_get_max_threads();
 
   // Generate random data
   std::vector<T> in(N);
-	if(dist_type==UNIF_DISTRIB){
-    #pragma omp parallel for
-    for(int j=0;j<omp_p;j++){
-      unsigned int seed=j*p+myrank;
-      size_t start=(j*N)/omp_p;
-      size_t end=((j+1)*N)/omp_p;
-      for(unsigned int i=start;i<end;i++){ 
-        in[i]=rand_r(&seed);
+  if (dist_type == UNIF_DISTRIB) {
+#pragma omp parallel for
+    for (int j = 0; j < omp_p; j++) {
+      unsigned int seed  = j * p + myrank;
+      size_t       start = ( j    * N) / omp_p;
+      size_t       end   = ((j+1) * N) / omp_p;
+      for (unsigned int i = start; i < end; i++) {
+        in[i] = rand_r(&seed);
       }
     }
-	} else if(dist_type==GAUSS_DISTRIB){
-    double e=2.7182818284590452;
-    double log_e=log(e);
-
-    unsigned int seed1=p+myrank;
-    long mn = rand_r(&seed1);
-
-    #pragma omp parallel for
-    for(int j=0;j<omp_p;j++){
-      unsigned int seed=j*p+myrank;
-      size_t start=(j*N)/omp_p;
-      size_t end=((j+1)*N)/omp_p;
-      for(unsigned int i=start;i<end;i++){ 
+  } else if (dist_type == GAUSS_DISTRIB) {
+    double       e     = 2.7182818284590452;
+    double       log_e = log(e);
+    unsigned int seed1 = p + myrank;
+    long         mn    = rand_r(&seed1);
+#pragma omp parallel for
+    for (int j = 0; j < omp_p; j++) {
+      unsigned int seed  = j * p + myrank;
+      size_t       start = ( j    * N) / omp_p;
+      size_t       end   = ((j+1) * N) / omp_p;
+      for (unsigned int i = start; i < end; i++) { 
         in[i]= mn + sqrt(-2*log(rand_r(&seed)*1.0/RAND_MAX)/log_e)
-              * cos(rand_r(&seed)*2*M_PI/RAND_MAX)*RAND_MAX*0.1;
+               * cos(rand_r(&seed)*2*M_PI/RAND_MAX)*RAND_MAX*0.1;
       }
     }
-	}
- 
- std::vector<T> in_cpy=in;
+  }
+  
+  std::vector<T> in_cpy = in;
   std::vector<T> out;
 
   // in=in_cpy;
-  SORT_FUNCTION<T>(in_cpy, comm);
+  SORT_FUNCTION<T>(in_cpy, comm);// todo from here
 #ifdef __VERIFY__
   verify(in,in_cpy,comm);
 #endif
@@ -236,25 +226,26 @@ double time_sort(size_t N, MPI_Comm comm, DistribType dist_type){
   return wtime;
 }
 
-int main(int argc, char **argv){
+/******************************************************************************/
+int main(int argc, char **argv) {
   
   if (argc < 4) {
     std::cerr << "Usage: " << argv[0] << " numThreads typeSize typeDistrib" << std::endl;
     std::cerr << "\t\t typeSize is a character for type of data follwed by data size per node." << std::endl;
-		std::cerr << "\t\t typeSize can be d-double, f-float, i-int, l-long." << std::endl;
+    std::cerr << "\t\t typeSize can be d-double, f-float, i-int, l-long." << std::endl;
     std::cerr << "\t\t Examples:" << std::endl;
     std::cerr << "\t\t i1GB : integer  array of size 1GB" << std::endl;
     std::cerr << "\t\t l1GB : long     array of size 1GB" << std::endl;
-		std::cerr << "\t\t typeDistrib can be UNIF, GAUSS" << std::endl;
-    return 1;  
+    std::cerr << "\t\t typeDistrib can be UNIF, GAUSS" << std::endl;
+    return 1;
   }
 
   std::cout<<setiosflags(std::ios::fixed)<<std::setprecision(4)<<std::setiosflags(std::ios::right);
 
-  //Set number of OpenMP threads to use.
+  // Set number of OpenMP threads to use.
   int num_threads = atoi(argv[1]);
-	omp_set_num_threads(num_threads);
-
+  omp_set_num_threads(num_threads);
+  
   // Initialize MPI
   MPI_Init(&argc, &argv);
 
@@ -336,75 +327,67 @@ int main(int argc, char **argv){
   return 0;
   //!----------------------------------
   */
-  int proc_group=0;
-  int min_np=1;
+  int      proc_group = 0;
+  int      min_np     = 1;
   MPI_Comm comm;
-
-  std::vector<double> tt(10000,0);
   
-  int k = 0; // in case size based runs are needed 
-  char dtype = argv[2][0];
-  long N = getNumElements(argv[2]);
-	DistribType dist_type=getDistType(argv[3]);
+  std::vector<double> tt(10000, 0);
+  
+  int         k         = 0; // in case size based runs are needed 
+  char        dtype     = argv[2][0];
+  long        N         = getNumElements(argv[2]);
+  DistribType dist_type = getDistType(argv[3]);
   if (!N) {
     std::cerr << "illegal typeSize code provided: " << argv[2] << std::endl;
     return 2;
   }
- 
-  std::string num;
+  
+  std::string       num;
   std::stringstream mystream;
   mystream << N*p;
   num = mystream.str();
   int insertPosition = num.length() - 3;
   while (insertPosition > 0) {
     num.insert(insertPosition, ",");
-    insertPosition-=3;
+    insertPosition -= 3;
   }
-  if (!myrank)
-    std::cout << "sorting array of size " << num << " keys of type " << dtype << std::endl;
+  if (!myrank) std::cout << "sorting array of size " << num << " keys of type " << dtype << std::endl;
+  // if (!myrank) std::cout << "sorting array of size " << num << " keys of type " << dtype << omp_get_max_threads() << std::endl;
 
   // check if arguments are ok ...
     
-  { // -- full size run  
+  { // -- full size run
     double ttt;
     
-    switch(dtype) {
-			case 'd':
-				ttt = time_sort<double>(N, MPI_COMM_WORLD,dist_type);
-				break;
-			case 'f':
-				ttt = time_sort<float>(N, MPI_COMM_WORLD,dist_type);
-				break;	
-			case 'i':
-				ttt = time_sort<int>(N, MPI_COMM_WORLD,dist_type);
-				break;
-      case 'l':
-        ttt = time_sort<long>(N, MPI_COMM_WORLD,dist_type);
-        break;
+    switch(dtype) {  // todo from here
+      case 'd':	ttt = time_sort<double>(N, MPI_COMM_WORLD, dist_type); break;
+      case 'f':	ttt = time_sort<float>(N, MPI_COMM_WORLD, dist_type);  break;
+      case 'i':	ttt = time_sort<int>(N, MPI_COMM_WORLD, dist_type);    break;
+      case 'l': ttt = time_sort<long>(N, MPI_COMM_WORLD, dist_type);   break;
     };
-#ifdef _PROFILE_SORT 			
-		if (!myrank) {
-			std::cout << "---------------------------------------------------------------------------" << std::endl;
-		#ifndef KWICK
-			std::cout << "\tSample Sort with " << KWAY << "-way all2all" << "\t\tMean\tMin\tMax" << std::endl;
-		#else
-		  #ifdef SWAPRANKS
-			  std::cout << "\t" << KWAY << "-way SwapRankSort " << "\t\tMean\tMin\tMax" << std::endl;
-      #else	
-        std::cout << "\t" << KWAY << "-way HyperQuickSort" << "\t\tMean\tMin\tMax" << std::endl;
-		  #endif
-		#endif
-			std::cout << "---------------------------------------------------------------------------" << std::endl;
-		}
-		printResults(num_threads, MPI_COMM_WORLD);
+    
+#ifdef _PROFILE_SORT
+    if (!myrank) {
+      std::cout << "---------------------------------------------------------------------------" << std::endl;
+      #ifndef KWICK
+        std::cout << "\tSample Sort with " << KWAY << "-way all2all" << "\t\tMean\tMin\tMax" << std::endl;
+      #else
+        #ifdef SWAPRANKS
+          std::cout << "\t" << KWAY << "-way SwapRankSort " << "\t\tMean\tMin\tMax" << std::endl;
+        #else	
+          std::cout << "\t" << KWAY << "-way HyperQuickSort" << "\t\tMean\tMin\tMax" << std::endl;
+        #endif
+      #endif
+      std::cout << "---------------------------------------------------------------------------" << std::endl;
+    }
+    printResults(num_threads, MPI_COMM_WORLD);
 #endif
 		
-    if(!myrank){
-      tt[100*k+0]=ttt;
-    }
+    if (!myrank) tt[100*k+0] = ttt;
+    
   }
 
-	// MPI_Finalize();
+  // MPI_Finalize();
   // return 0;
   
   for(int i=p; myrank<i && i>=min_np; i=i>>1) proc_group++;
